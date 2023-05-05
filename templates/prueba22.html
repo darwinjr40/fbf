@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html >
+  <head>
+    <meta charset="UTF-8">
+    <title>Flask Client Camera Web App</title>
+
+    <style>
+     #video {
+      transform: rotateY(180deg);
+      -webkit-transform:rotateY(180deg); /* Safari and Chrome */
+      -moz-transform:rotateY(180deg); /* Firefox */
+      
+     }
+    </style>
+    <script      src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <!-- <script  src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io-stream/0.9.0/socket.io-stream.js" integrity="sha512-umYd1BmxXfBHYbe8GB+7VHSMF1A1g6JfFL8CPlvc6UoM+RG2bJkjjrxhUO+sh0lBVLu+hB4q3s8w2bTf+EnPeg==" crossorigin="anonymous"></script> -->
+    <!-- <script src="https://cdn.socket.io-stream.com/2.0.1/socket.io-stream.min.js"></script> -->
+  </head>
+
+  <body>
+
+    <!-- <div id="container">
+      <video autoplay playsinline id="videoElement"></video>
+      <canvas id="canvas" width="400" height="300"></canvas>
+    </div>
+
+    <div class= 'video'>
+      <img id="photo" width="400" height="300">
+    </div> -->
+    <video id="video" autoplay></video>
+    <canvas id="canvas"></canvas>
+
+    <img id="imagen" width="400" height="300">
+    <script 
+    src="{{url_for('static', filename='js/prueba22.js')}}"
+    >
+    </script>
+
+
+  </body>
+
+</html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Camera Streaming</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"></script>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <img id="imagen" width="600" height="500">
+    <button id="start-button">Start Streaming</button>
+    
+
+    <hr>
+    <br>
+    <div>
+        <video id="video" autoplay></video>
+    </div>
+    
+    <script 
+    src="{{url_for('static', filename='js/webrtc.js')}}"
+    >
+    </script>
+</body>
+</html>

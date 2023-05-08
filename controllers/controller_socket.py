@@ -55,7 +55,8 @@ print('xd')
 print(rostroscod)
 
 
-socketio = SocketIO()
+socketio = SocketIO(None, cors_allowed_origins="*")
+#socketio = SocketIO(None, cors_allowed_origins="*", logger=True, engineio_logger=True, ping_timeout=300)
 
 
 #get instancia
@@ -68,8 +69,8 @@ def create_socketio_app(app):
 @socketio.on('event')
 def event(json):
     print("te estan saludando desde el cliente:" + json)
-    json = json + ' desde el server'
-    emit('event',json)
+    #json = json + ' desde el server'
+    #emit('event',json)
 #webrtc------------------------------
 @socketio.on('webrtc')
 def webrtc(stream):
@@ -78,8 +79,17 @@ def webrtc(stream):
         nparr = np.frombuffer(img_bytes, np.uint8)    
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)  
         frame = get_frame_comparation(frame)
-        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()          
-        emit('processed_webrtc', encoded_string)
+        #frame = get_face(frame)
+        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame[0])[1]).decode()
+        label = frame[1]
+
+        data = {
+            'img': encoded_string,
+            'labels': label
+        }
+
+        #emit('processed_webrtc', encoded_string)
+        emit('processed_webrtc', data)
         
     except Exception as e:    
         print({'result': 'errors', 'type': f"Tipo de excepción: {type(e)}", 'errors': f"Mensaje de error: {e}"})
@@ -87,6 +97,7 @@ def webrtc(stream):
     
 def get_frame_comparation(frame):
     global  clases, rostroscod
+    labels = []
     # Procesar la imagen con OpenCV
     frame2 = cv2.resize(frame, (0,0), None, 0.25, 0.25)
     #Conversion de color
@@ -108,10 +119,45 @@ def get_frame_comparation(frame):
             #Escalanos
             yi, xf, yf, xi = yi*4, xf*4, yf*4, xi*4                                
             cv2.rectangle(frame, (xi, yi), (xf, yf), (100, 500, 100), 3)                                       
-            nombreFile = clases[min].upper()            
+            nombreFile = clases[min].upper()
+            labels.append(nombreFile)
             cv2.putText(frame, nombreFile, (xi+6, yi-6), cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 500, 100), 2)
-            break
-    return frame 
+            #break
+    return frame, labels
+
+def get_face(frame):
+    global clases, rostroscod
+
+    # Procesar la imagen con OpenCV
+    frame2 = cv2.resize(frame, (0, 0), None, 0.25, 0.25)
+    rgb = cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB)
+
+    # Identificar posibles rostros
+    faces = fr.face_locations(rgb)
+    facescod = fr.face_encodings(rgb, faces)
+
+    for facecod, faceloc in zip(facescod, faces):
+        # Comparar rostros de DB con rostro en tiempo real
+        comparaciones = fr.compare_faces(rostroscod, facecod, 0.62)
+        simi = fr.face_distance(rostroscod, facecod)
+        # BUScanos el valor mas bajo, retorna el indice
+        min = np.argmin(simi)
+        yi, xf, yf, xi = faceloc
+        # Escalar coordenadas de la región del rostro
+        yi, xf, yf, xi = yi*4, xf*4, yf*4, xi*4
+
+        if comparaciones[min]:
+            # Dibujar rectángulo y etiqueta en el marco completo
+            cv2.rectangle(frame, (xi, yi), (xf, yf), (100, 500, 100), 3)
+            nombreFile = clases[min].upper()
+            cv2.putText(frame, nombreFile, (xi+6, yi-6), cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 500, 100), 2)
+            # Devolver el marco completo
+            return frame
+        else:
+            # Devolver solo la región del rostro
+            return frame[yi:yf, xi:xf]
+    # Devolver el marco completo si no se detectaron rostros
+    return frame
    
 #buscar  faces of db---------------------------------------------------------
 @socketio.on('buscarFaces')

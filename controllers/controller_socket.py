@@ -81,11 +81,11 @@ def webrtc(stream):
         frame = get_frame_comparation(frame)
         #frame = get_face(frame)
         encoded_string = base64.b64encode(cv2.imencode('.jpg', frame[0])[1]).decode()
-        label = frame[1]
+        labels = frame[1]
 
         data = {
             'img': encoded_string,
-            'labels': label
+            'labels': labels
         }
 
         #emit('processed_webrtc', encoded_string)
@@ -111,7 +111,12 @@ def get_frame_comparation(frame):
         #Comparamos rostros de DB con rostro en tiempo real
         comparaciones = fr.compare_faces(rostroscod, facecod, 0.62)
         print(comparaciones)        
-        simi = fr.face_distance(rostroscod, facecod)        
+        simi = fr.face_distance(rostroscod, facecod)
+
+        yi, xf, yf, xi = faceloc
+        # Escalamos
+        yi, xf, yf, xi = yi * 4, xf * 4, yf * 4, xi * 4
+        cv2.rectangle(frame, (xi, yi), (xf, yf), (100, 500, 100), 3)
         #BUScanos el valor mas bajo, retorna el indice
         min = np.argmin(simi)        
         if comparaciones[min]:
@@ -127,6 +132,7 @@ def get_frame_comparation(frame):
 
 def get_face(frame):
     global clases, rostroscod
+    labels = []
 
     # Procesar la imagen con OpenCV
     frame2 = cv2.resize(frame, (0, 0), None, 0.25, 0.25)
@@ -143,21 +149,23 @@ def get_face(frame):
         # BUScanos el valor mas bajo, retorna el indice
         min = np.argmin(simi)
         yi, xf, yf, xi = faceloc
-        # Escalar coordenadas de la región del rostro
-        yi, xf, yf, xi = yi*4, xf*4, yf*4, xi*4
+        # Escalamos
+        yi, xf, yf, xi = yi * 4, xf * 4, yf * 4, xi * 4
+        cv2.rectangle(frame, (xi, yi), (xf, yf), (100, 500, 100), 3)
 
         if comparaciones[min]:
             # Dibujar rectángulo y etiqueta en el marco completo
             cv2.rectangle(frame, (xi, yi), (xf, yf), (100, 500, 100), 3)
             nombreFile = clases[min].upper()
             cv2.putText(frame, nombreFile, (xi+6, yi-6), cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 500, 100), 2)
+            labels.append(nombreFile)
             # Devolver el marco completo
             return frame
         else:
             # Devolver solo la región del rostro
-            return frame[yi:yf, xi:xf]
+            return frame#[yi:yf, xi:xf]
     # Devolver el marco completo si no se detectaron rostros
-    return frame
+    return frame, labels
    
 #buscar  faces of db---------------------------------------------------------
 @socketio.on('buscarFaces')

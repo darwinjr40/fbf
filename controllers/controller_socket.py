@@ -10,7 +10,7 @@ import time
 # from app import socketio
 #-----------------------------------------------------
 def saved_files(dir):
-    global names_files_faces, images_face    
+    global names_files_faces, images_face, names_files_complete_faces               
     lista = os.listdir(dir) # lista = os.listdir('.')    
     for data in lista:        #Leemos los rostros del DB
         imgdb = cv2.imread(f'{dir}/{data}') #Leemos Las imagenes de los rostros
@@ -19,11 +19,8 @@ def saved_files(dir):
     print(f"lista: {lista}")        
     print (f"names_files_faces: {names_files_faces}")
     
-    
-    
 
 
-#-----------------------------------------------------
 #Funcion para codificar los rostros
 def codrostros(images):
     listacod = []
@@ -34,14 +31,37 @@ def codrostros(images):
     return listacod
 
 
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-images_face = []
+def saved_files1(dir): # Obtener la lista de archivos previamente procesados (si existe)
+    global names_files_faces, coded_faces, names_files_complete_faces               
+    previous_files = set(names_files_complete_faces) #names_files_complete_faces    
+    current_files = set(os.listdir(dir)) # Obtener la lista actual de archivos en el directorio     
+    new_files = current_files - previous_files # Identificar los nuevos archivos (diferencia entre las listas)
+    for data in new_files:  
+        imgdb = cv2.imread(f'{dir}/{data}')
+        img = cv2.cvtColor(imgdb, cv2.COLOR_BGR2RGB) # Correccion de color        
+        cod = fr.face_encodings(img)[0] #Codificamos la imagen        
+        coded_faces.append(cod) #almacenamos
+        names_files_faces.append(os.path.splitext(data)[0]) #ALmacenamos nombre          
+    names_files_complete_faces = list(current_files) # Actuali zar la lista de archivos previamente procesados
+    print (f"names_files_complete_faces: {names_files_complete_faces}")
+    print (f"names_files_faces: {names_files_faces}")
+    print (f"new_files: {new_files}")
+    print (f"coded_faces: {coded_faces}")
+
+
+#Main -----------------------------------------------------
+names_files_complete_faces = []
 names_files_faces = []
-saved_files(dir='personal')
-coded_faces = codrostros(images_face)
-print(f"coded_faces: {coded_faces}")
+coded_faces = []
+saved_files1(dir='personal')
 clients = 0
 thread = None
+
+
+images_face = []
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+# saved_files(dir='personal')
+# coded_faces = codrostros(images_face)
 
 
 #socketio = SocketIO(None, cors_allowed_origins="*", logger=True, engineio_logger=True, ping_timeout=300)
@@ -345,7 +365,8 @@ def process_image(image_data):
     
 def start_video_thread():
     global thread
-    print('todo bien')
+    saved_files1(dir='personal')
+    # print('todo bien')
     thread = Thread(target=send_video)
     thread.daemon = True
     thread.start()

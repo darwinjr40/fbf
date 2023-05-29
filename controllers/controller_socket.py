@@ -367,8 +367,7 @@ def start_video_thread():
 def send_video():
     global clients
     capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
-    # while capture.isOpened():
-    while True:
+    while capture.isOpened():
         ret, frame = capture.read() # lee un fotograma de la cámara      
         if ((not ret) or (clients == 0)): break
         

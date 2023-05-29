@@ -13,8 +13,10 @@ startButton.addEventListener('click', () => {
           setInterval(() => {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const base64ImageData = canvas.toDataURL('image/png', 0.5).split(',')[1];
-            socket.emit('webrtc', base64ImageData);
-          }, 500);
+           socket.emit('webrtc', base64ImageData);
+            // socket.emit('event', base64ImageData);
+//            console.log(base64ImageData);
+          }, 1000);
         })
         .catch(error => {
             console.log('Error accessing camera:', error.message);
@@ -31,5 +33,20 @@ video.addEventListener("loadedmetadata", () => {
 
 socket.on('processed_webrtc', (processed_data) => {
   console.log('llego del server');
-  img.src = "data:image/jpg;base64," + processed_data;   
+  // console.log('nise');
+  console.log(processed_data['img']);
+  img.src = "data:image/jpg;base64," + processed_data['img'];
+});
+
+socket.on('connect', function () {
+  console.log('conectados');
+  // socket.on('event', (res) => {
+  //     console.log(res);
+  // });    
+});
+
+socket.on('event', (processed_data) => {
+  console.log('llego del server');
+  console.log(processed_data['img']);
+//  img.src = "data:image/jpg;base64," + processed_data['img'];
 });

@@ -5,9 +5,9 @@ from werkzeug.exceptions import abort
 from flask_socketio import SocketIO, emit
 from io import BytesIO
 from PIL import Image
-
-
-
+from threading import Thread
+import time
+# from app import socketio
 #-----------------------------------------------------
 def init():
     # # Accedemos a la carpeta
@@ -53,10 +53,12 @@ init()
 rostroscod = codrostros(images)
 print('xd')
 print(rostroscod)
+clients = 0
+thread = None
 
 
-socketio = SocketIO(None, cors_allowed_origins="*")
 #socketio = SocketIO(None, cors_allowed_origins="*", logger=True, engineio_logger=True, ping_timeout=300)
+socketio = SocketIO(None, cors_allowed_origins="*")
 
 
 #get instancia
@@ -68,9 +70,9 @@ def create_socketio_app(app):
 #socket---------------------------------------------------------
 @socketio.on('event')
 def event(json):
-    print("te estan saludando desde el cliente:" + json)
-    #json = json + ' desde el server'
-    #emit('event',json)
+    print("te estan saludando desde el cliente:")
+    # json = json + ' desde el server'
+    emit('event', 'nani')
 #webrtc------------------------------
 @socketio.on('webrtc')
 def webrtc(stream):
@@ -92,44 +94,49 @@ def webrtc(stream):
         emit('processed_webrtc', data)
         
     except Exception as e:    
-        print({'result': 'errors', 'type': f"Tipo de excepción: {type(e)}", 'errors': f"Mensaje de error: {e}"})
-        # return jsonify({'result': 'errors', 'type': f"Tipo de excepción: {type(e)}", 'errors': f"Mensaje de error: {e}"})  
+        # print({'result': 'errors', 'type': f"Tipo de excepción: {type(e)}", 'errors': f"Mensaje de error: {e}"})
+        return jsonify({'result': 'errors', 'type': f"Tipo de excepción: {type(e)}", 'errors': f"Mensaje de error: {e}"})
     
 def get_frame_comparation(frame):
     global  clases, rostroscod
     labels = []
     # Procesar la imagen con OpenCV
-    frame2 = cv2.resize(frame, (0,0), None, 0.25, 0.25)
-    #Conversion de color
-    rgb = cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB)
-    # rgb = cv2.cvtColor(frame2, cv2.COLOR_RGB2GRAY)
-    #identificar posibles rostros
-    faces  = fr.face_locations(rgb)
+    frame2 = cv2.resize(frame, (0,0), None, 0.25, 0.25)    
+    rgb = cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB) #Conversion de color
+    # rgb = cv2.cvtColor(frame2, cv2.COLOR_RGB2GRAY)    
+    faces  = fr.face_locations(rgb) #identificar posibles rostros
     facescod = fr.face_encodings(rgb, faces)
     print(faces)    
-    for facecod, faceloc in zip(facescod, faces) :
-        #Comparamos rostros de DB con rostro en tiempo real
-        comparaciones = fr.compare_faces(rostroscod, facecod, 0.62)
-        print(comparaciones)        
-        simi = fr.face_distance(rostroscod, facecod)
-
+    for facecod, faceloc in zip(facescod, faces) :        
         yi, xf, yf, xi = faceloc
-        # Escalamos
-        yi, xf, yf, xi = yi * 4, xf * 4, yf * 4, xi * 4
-        cv2.rectangle(frame, (xi, yi), (xf, yf), (100, 500, 100), 3)
-        #BUScanos el valor mas bajo, retorna el indice
-        min = np.argmin(simi)        
+        yi, xf, yf, xi = yi*4, xf*4, yf*4, xi*4     #Escalanos
+        comparaciones = fr.compare_faces(rostroscod, facecod, 0.62) #Comparamos rostros de DB con rostro en tiempo real
+        print(comparaciones)        
+        simi = fr.face_distance(rostroscod, facecod)        
+        min = np.argmin(simi) # Escalamos
         if comparaciones[min]:
-            yi, xf, yf, xi = faceloc
-            #Escalanos
-            yi, xf, yf, xi = yi*4, xf*4, yf*4, xi*4                                
-            cv2.rectangle(frame, (xi, yi), (xf, yf), (100, 500, 100), 3)                                       
+            line_color = (0, 0, 255)              
             nombreFile = clases[min].upper()
             labels.append(nombreFile)
-            cv2.putText(frame, nombreFile, (xi+6, yi-6), cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 500, 100), 2)
-            #break
+            cv2.putText(frame, nombreFile, (xi+6, yi-6), cv2.FONT_HERSHEY_SIMPLEX, 1, line_color, 3)
+            draw_lines(frame, xi, yi, xf, yf, dif=50, line_width=8, line_color=line_color)                    
+            break
+        else:             
+            line_color = (0, 255, 0)
+            draw_lines(frame, xi, yi, xf, yf, dif=50, line_width=8, line_color=line_color)        
     return frame, labels
 
+def draw_lines(frame, xi, yi, xf, yf, dif,line_width, line_color):
+    cv2.rectangle(img=frame, pt1=(xi, yi), pt2=(xf, yf), color=line_color, thickness=1)
+    cv2.line(frame, (xi, yi), (xi+dif, yi), line_color, line_width)  # Top Left
+    cv2.line(frame, (xi, yi), (xi, yi+dif), line_color, line_width)
+    cv2.line(frame, (xf, yi), (xf - dif, yi), line_color, line_width)  # Top Right
+    cv2.line(frame, (xf, yi), (xf, yi + dif), line_color, line_width)
+    cv2.line(frame, (xi, yf), (xi + dif, yf), line_color, line_width)  # Bottom Left
+    cv2.line(frame, (xi, yf), (xi, yf - dif), line_color, line_width)
+    cv2.line(frame, (xf, yf), (xf - dif, yf), line_color, line_width)  # Bottom right
+    cv2.line(frame, (xf, yf), (xf, yf - dif), line_color, line_width)
+    
 def get_face(frame):
     global clases, rostroscod
     labels = []
@@ -325,4 +332,92 @@ def process_image(image_data):
     
     return img_bytes
 
+@socketio.on('connect')
+def handle_connect():
+    global clients, thread
+    clients = len(socketio.server.manager.rooms['/'].keys()) - 1  # Restar 1 para excluir al propio cliente
+    print(f"Número de clientes conectados: {clients}")
+    print('se conectaron')
+    if  (not thread) or  (not thread.is_alive()):
+        start_video_thread()
+    else :
+        print('el hilo ya se ejecuto')    
+    # emit('processed_webrtc', 'asdasdsd')
+    
+@socketio.on('disconnect')
+def handle_connect():
+    global clients
+    print('se desconectaron')
+    clients -=1
+    print(f"Número de clientes conectados: {clients}")
+    # emit('processed_webrtc', 'asdasdsd')
+    # start_repeating_task()
+    
+    
+def start_repeating_task():
+            # Ejemplo: Enviar un mensaje cada 5 segundos
+        interval_seconds = 2
+        face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+        cap = cv2.VideoCapture(0)
 
+        while True:
+            try:
+                ret, img = cap.read()
+                if not ret:
+                    print('error camara')
+                    # break    
+                else: 
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+                    # Definir el color y el grosor del rectángulo
+                    color = (0, 0, 255) # Rojo
+                    grosor = 2
+                    for (x, y, w, h) in faces:
+                        # Definir punto de inicio y punto final para el rectángulo
+                        punto_inicial = (x, y-65)
+                        punto_final = (x + w, y+h + 20)
+                        cv2.rectangle(img, punto_inicial, punto_final, color, grosor)    
+                                    
+                    # cv2.imshow('Camera', img)
+                    # k = cv2.waitKey(30)
+                    # if k == 27:  # es el asc1i para esc
+                    #     break
+                    encoded_string = base64.b64encode(cv2.imencode('.jpg', img[0])[1]).decode()        
+                    data = {
+                        'img': encoded_string,
+                        'labels': ""
+                    }
+                    print(data)
+                    socketio.sleep(interval_seconds)
+                    emit('processed_webrtc', data)
+        
+            except Exception as e:    
+                print({'result': 'errors', 'type': f"Tipo de excepción: {type(e)}", 'errors': f"Mensaje de error: {e}"})
+
+
+def start_video_thread():
+    global thread
+    print('todo bien')
+    thread = Thread(target=send_video)
+    thread.daemon = True
+    thread.start()
+    
+    
+def send_video():
+    global clients
+    capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
+    # while capture.isOpened():
+    while True:
+        ret, frame = capture.read() # lee un fotograma de la cámara      
+        if ((not ret) or (clients == 0)): break
+        
+        # time.sleep(0.05)
+        frame = get_frame_comparation(frame)                        
+        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame[0])[1]).decode()       
+        data = {
+            'img': encoded_string,
+            'labels': ''
+        }
+        socketio.emit('processed_webrtc', data)
+    print('finaliso send_video --------------------------')
+    capture.release() # libera la cámara

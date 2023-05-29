@@ -61,19 +61,40 @@ thread = None
 socketio = SocketIO(None, cors_allowed_origins="*")
 
 
-#get instancia
+#get instancia------------------------------------------------------
 def create_socketio_app(app):
     socketio.init_app(app)
     return socketio
+#socket default------------------------------------------------------
+@socketio.on('connect')
+def handle_connect():
+    global clients, thread
+    clients = len(socketio.server.manager.rooms['/'].keys()) - 1  # Restar 1 para excluir al propio cliente
+    print(f"Número de clientes conectados: {clients}")
+    print('se conectaron')
+    if  (not thread) or  (not thread.is_alive()):
+        start_video_thread()
+    else :
+        print('el hilo ya se esta ejecutando---------------------')    
+    # emit('processed_webrtc', 'asdasdsd')
+    
+@socketio.on('disconnect')
+def handle_connect():
+    global clients
+    print('se desconectaron')
+    clients -=1
+    print(f"Número de clientes conectados: {clients}")
+    # emit('processed_webrtc', 'asdasdsd')
+    # start_repeating_task()
+    
 
-
-#socket---------------------------------------------------------
+#socket eventos---------------------------------------------------------
 @socketio.on('event')
 def event(json):
     print("te estan saludando desde el cliente:")
     # json = json + ' desde el server'
     emit('event', 'nani')
-#webrtc------------------------------
+
 @socketio.on('webrtc')
 def webrtc(stream):
     try:
@@ -332,69 +353,9 @@ def process_image(image_data):
     
     return img_bytes
 
-@socketio.on('connect')
-def handle_connect():
-    global clients, thread
-    clients = len(socketio.server.manager.rooms['/'].keys()) - 1  # Restar 1 para excluir al propio cliente
-    print(f"Número de clientes conectados: {clients}")
-    print('se conectaron')
-    if  (not thread) or  (not thread.is_alive()):
-        start_video_thread()
-    else :
-        print('el hilo ya se ejecuto')    
-    # emit('processed_webrtc', 'asdasdsd')
-    
-@socketio.on('disconnect')
-def handle_connect():
-    global clients
-    print('se desconectaron')
-    clients -=1
-    print(f"Número de clientes conectados: {clients}")
-    # emit('processed_webrtc', 'asdasdsd')
-    # start_repeating_task()
+
     
     
-def start_repeating_task():
-            # Ejemplo: Enviar un mensaje cada 5 segundos
-        interval_seconds = 2
-        face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-        cap = cv2.VideoCapture(0)
-
-        while True:
-            try:
-                ret, img = cap.read()
-                if not ret:
-                    print('error camara')
-                    # break    
-                else: 
-                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-                    # Definir el color y el grosor del rectángulo
-                    color = (0, 0, 255) # Rojo
-                    grosor = 2
-                    for (x, y, w, h) in faces:
-                        # Definir punto de inicio y punto final para el rectángulo
-                        punto_inicial = (x, y-65)
-                        punto_final = (x + w, y+h + 20)
-                        cv2.rectangle(img, punto_inicial, punto_final, color, grosor)    
-                                    
-                    # cv2.imshow('Camera', img)
-                    # k = cv2.waitKey(30)
-                    # if k == 27:  # es el asc1i para esc
-                    #     break
-                    encoded_string = base64.b64encode(cv2.imencode('.jpg', img[0])[1]).decode()        
-                    data = {
-                        'img': encoded_string,
-                        'labels': ""
-                    }
-                    print(data)
-                    socketio.sleep(interval_seconds)
-                    emit('processed_webrtc', data)
-        
-            except Exception as e:    
-                print({'result': 'errors', 'type': f"Tipo de excepción: {type(e)}", 'errors': f"Mensaje de error: {e}"})
-
-
 def start_video_thread():
     global thread
     print('todo bien')

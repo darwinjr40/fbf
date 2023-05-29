@@ -9,22 +9,15 @@ from threading import Thread
 import time
 # from app import socketio
 #-----------------------------------------------------
-def init():
-    # # Accedemos a la carpeta
-    global clases, images
-    path = 'personal'    
-    lista = os.listdir(path)
-    # lista = os.listdir('.')
-    print(lista)    
-    # #Leemos los rostros del DB
-    for lis in lista:
-        #Leemos Las imagenes de los rostros
-        imgdb = cv2.imread(f'{path}/{lis}')
-        # ALmacenamos imagen
-        images.append(imgdb)
-        #ALmacenamos nombre
-        clases.append(os.path.splitext(lis)[0])
-    print (clases)
+def saved_files(dir):
+    global names_files_faces, images_face    
+    lista = os.listdir(dir) # lista = os.listdir('.')    
+    for data in lista:        #Leemos los rostros del DB
+        imgdb = cv2.imread(f'{dir}/{data}') #Leemos Las imagenes de los rostros
+        images_face.append(imgdb) # ALmacenamos imagen
+        names_files_faces.append(os.path.splitext(data)[0]) #ALmacenamos nombre
+    print(f"lista: {lista}")        
+    print (f"names_files_faces: {names_files_faces}")
     
     
     
@@ -34,25 +27,19 @@ def init():
 #Funcion para codificar los rostros
 def codrostros(images):
     listacod = []
-    # Iterano0s
-    for img in images:
-        # Correccion de color
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        #Codificamos la imagen
-        cod = fr.face_encodings(img)[0]
-        #ALmacenamos
-        listacod.append(cod)
-
+    for img in images: # Iterano0s        
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # Correccion de color        
+        cod = fr.face_encodings(img)[0] #Codificamos la imagen        
+        listacod.append(cod) #ALmacenamos
     return listacod
 
 
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-images = []
-clases = []
-init()
-rostroscod = codrostros(images)
-print('xd')
-print(rostroscod)
+images_face = []
+names_files_faces = []
+saved_files(dir='personal')
+coded_faces = codrostros(images_face)
+print(f"coded_faces: {coded_faces}")
 clients = 0
 thread = None
 
@@ -119,7 +106,7 @@ def webrtc(stream):
         return jsonify({'result': 'errors', 'type': f"Tipo de excepción: {type(e)}", 'errors': f"Mensaje de error: {e}"})
     
 def get_frame_comparation(frame):
-    global  clases, rostroscod
+    global  names_files_faces, coded_faces
     labels = []
     # Procesar la imagen con OpenCV
     frame2 = cv2.resize(frame, (0,0), None, 0.25, 0.25)    
@@ -131,13 +118,13 @@ def get_frame_comparation(frame):
     for facecod, faceloc in zip(facescod, faces) :        
         yi, xf, yf, xi = faceloc
         yi, xf, yf, xi = yi*4, xf*4, yf*4, xi*4     #Escalanos
-        comparaciones = fr.compare_faces(rostroscod, facecod, 0.62) #Comparamos rostros de DB con rostro en tiempo real
+        comparaciones = fr.compare_faces(coded_faces, facecod, 0.62) #Comparamos rostros de DB con rostro en tiempo real
         print(comparaciones)        
-        simi = fr.face_distance(rostroscod, facecod)        
+        simi = fr.face_distance(coded_faces, facecod)        
         min = np.argmin(simi) # Escalamos
         if comparaciones[min]:
             line_color = (0, 0, 255)              
-            nombreFile = clases[min].upper()
+            nombreFile = names_files_faces[min].upper()
             labels.append(nombreFile)
             cv2.putText(frame, nombreFile, (xi+6, yi-6), cv2.FONT_HERSHEY_SIMPLEX, 1, line_color, 3)
             draw_lines(frame, xi, yi, xf, yf, dif=50, line_width=8, line_color=line_color)                    
@@ -159,7 +146,7 @@ def draw_lines(frame, xi, yi, xf, yf, dif,line_width, line_color):
     cv2.line(frame, (xf, yf), (xf, yf - dif), line_color, line_width)
     
 def get_face(frame):
-    global clases, rostroscod
+    global names_files_faces, coded_faces
     labels = []
 
     # Procesar la imagen con OpenCV
@@ -172,8 +159,8 @@ def get_face(frame):
 
     for facecod, faceloc in zip(facescod, faces):
         # Comparar rostros de DB con rostro en tiempo real
-        comparaciones = fr.compare_faces(rostroscod, facecod, 0.62)
-        simi = fr.face_distance(rostroscod, facecod)
+        comparaciones = fr.compare_faces(coded_faces, facecod, 0.62)
+        simi = fr.face_distance(coded_faces, facecod)
         # BUScanos el valor mas bajo, retorna el indice
         min = np.argmin(simi)
         yi, xf, yf, xi = faceloc
@@ -184,7 +171,7 @@ def get_face(frame):
         if comparaciones[min]:
             # Dibujar rectángulo y etiqueta en el marco completo
             cv2.rectangle(frame, (xi, yi), (xf, yf), (100, 500, 100), 3)
-            nombreFile = clases[min].upper()
+            nombreFile = names_files_faces[min].upper()
             cv2.putText(frame, nombreFile, (xi+6, yi-6), cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 500, 100), 2)
             labels.append(nombreFile)
             # Devolver el marco completo
@@ -198,7 +185,7 @@ def get_face(frame):
 #buscar  faces of db---------------------------------------------------------
 @socketio.on('buscarFaces')
 def buscar_faces(stream):
-    global  images, clases, rostroscod
+    global  images_face, names_files_faces, coded_faces
     
     img_bytes = base64.b64decode(stream.split(',')[1])
     nparr = np.frombuffer(img_bytes, np.uint8)
@@ -218,10 +205,10 @@ def buscar_faces(stream):
     # Iteranos
     for facecod, faceloc in zip(facescod, faces) :
         #Comparamos rostros de DB con rostro en tiempo real
-        comparacion = fr.compare_faces(rostroscod, facecod, 0.62)
+        comparacion = fr.compare_faces(coded_faces, facecod, 0.62)
         print(comparacion)
         #Calculamos la solicitud
-        simi = fr.face_distance(rostroscod, facecod)
+        simi = fr.face_distance(coded_faces, facecod)
         # print(simi)
 
         #BUScanos el valor mas bajo, retorna el indice
@@ -238,7 +225,7 @@ def buscar_faces(stream):
 
             # Comparanos
             if comp1 != indice:
-                nombre = clases[min].upper()
+                nombre = names_files_faces[min].upper()
                 
                 #Para dibujar canbianos colores
                 # r = random.randrange(0, 255, 50)

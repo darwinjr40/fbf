@@ -5,7 +5,7 @@ sys.path.append('controllers')
 
 from controller_service import service_bp
 from controller_camera import camera_bp
-# from controller_socket import create_socketio_app
+#from controller_socket import create_socketio_app
 from controllers.controller_socket import create_socketio_app
 
 from flask_socketio import SocketIO, emit

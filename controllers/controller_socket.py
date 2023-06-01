@@ -377,7 +377,7 @@ def send_video():
     capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
     while capture.isOpened():
         ret, frame = capture.read() # lee un fotograma de la cámara      
-        if ((not ret) or (clients == 0)): break
+        como instalar en python: 
         
         # time.sleep(0.05)
         frame = get_frame_comparation(frame)                        

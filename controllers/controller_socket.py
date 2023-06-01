@@ -373,11 +373,11 @@ def start_video_thread():
     
     
 def send_video():
-    global clients
+    global clients #dd
     capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
     while capture.isOpened():
         ret, frame = capture.read() # lee un fotograma de la cámara      
-        como instalar en python: 
+        if ((not ret) or (clients == 0)): break
         
         # time.sleep(0.05)
         frame = get_frame_comparation(frame)                        

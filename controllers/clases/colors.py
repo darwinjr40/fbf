@@ -1,0 +1,11 @@
+class Color:
+    NEGRO = (0, 0, 0)
+    BLANCO = (255, 255, 255)
+    ROJO = (0, 0, 255)
+    VERDE = (0, 255, 0)
+    AZUL = (255, 0, 0)
+    AMARILLO = (0, 255, 255)
+    NARANJA = (0, 128, 255)
+    MORADO = (128, 0, 128)
+    ROSA = (147, 20, 255)
+    GRIS = (128, 128, 128)

@@ -1,12 +1,28 @@
+from collections import deque
+import  os, cv2, base64, random, time
+import multiprocessing
+import asyncio
+import math
+
+import numpy as np
+import face_recognition as fr
+import cvlib as cv
+
+
 from flask import Flask, Blueprint, render_template, request, jsonify, url_for
-import  os, cv2, base64, random, numpy as np, face_recognition as fr
 from werkzeug.utils import redirect
 from werkzeug.exceptions import abort
 from flask_socketio import SocketIO, emit
 from io import BytesIO
 from PIL import Image
 from threading import Thread
-import time
+from controllers.clases.hilo import  Hilo
+from controllers.clases.colors import  Color
+from controllers.clases.videos import  Video
+from concurrent.futures import ThreadPoolExecutor
+from config import ENV
+from multiprocessing import Process, Queue
+from keras.models import load_model
 # from app import socketio
 #-----------------------------------------------------
 def saved_files(dir):
@@ -50,47 +66,51 @@ def saved_files1(dir): # Obtener la lista de archivos previamente procesados (si
 
 
 #Main -----------------------------------------------------
+#socketio = SocketIO(None, cors_allowed_origins="*", logger=True, engineio_logger=True, ping_timeout=300)
+socketio = SocketIO(None, cors_allowed_origins="*")
+
 names_files_complete_faces = []
 names_files_faces = []
 coded_faces = []
-saved_files1(dir='personal')
+saved_files1(dir=ENV.DIR_FACES)
+print(ENV.DIR_FACES)
 clients = 0
-thread = None
-
-
+thread0 = None
+thread1 = None
+thread2 = None
+# hilo: Hilo = None
+hilos : Hilo = [None , None]
+dim_hilos = len(hilos)
 images_face = []
+queue = Queue(maxsize=256)  
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 # saved_files(dir='personal')
 # coded_faces = codrostros(images_face)
 
 
-#socketio = SocketIO(None, cors_allowed_origins="*", logger=True, engineio_logger=True, ping_timeout=300)
-socketio = SocketIO(None, cors_allowed_origins="*")
 
 
 #get instancia------------------------------------------------------
 def create_socketio_app(app):
     socketio.init_app(app)
     return socketio
+
 #socket default------------------------------------------------------
 @socketio.on('connect')
 def handle_connect():
-    global clients, thread
+    global clients
+    global queue
     clients = len(socketio.server.manager.rooms['/'].keys()) - 1  # Restar 1 para excluir al propio cliente
-    print(f"Número de clientes conectados: {clients}")
-    print('se conectaron')
-    if  (not thread) or  (not thread.is_alive()):
-        start_video_thread()
-    else :
-        print('el hilo ya se esta ejecutando---------------------')    
+    print(f"se conectaron, Número de clientes conectados: {clients}")
+    print(queue.qsize())
+    # start_video_thread()
     # emit('processed_webrtc', 'asdasdsd')
     
 @socketio.on('disconnect')
 def handle_connect():
     global clients
-    print('se desconectaron')
     clients -=1
-    print(f"Número de clientes conectados: {clients}")
+    print(f"se desconectaron, Número de clientes conectados: {clients}")
     # emit('processed_webrtc', 'asdasdsd')
     # start_repeating_task()
     
@@ -98,9 +118,10 @@ def handle_connect():
 #socket eventos---------------------------------------------------------
 @socketio.on('event')
 def event(json):
-    print("te estan saludando desde el cliente:")
+    start_video_thread()
+    # print("te estan saludando desde el cliente:")
     # json = json + ' desde el server'
-    emit('event', 'nani')
+    # emit('event', 'nani')
 
 @socketio.on('webrtc')
 def webrtc(stream):
@@ -164,7 +185,65 @@ def draw_lines(frame, xi, yi, xf, yf, dif,line_width, line_color):
     cv2.line(frame, (xi, yf), (xi, yf - dif), line_color, line_width)
     cv2.line(frame, (xf, yf), (xf - dif, yf), line_color, line_width)  # Bottom right
     cv2.line(frame, (xf, yf), (xf, yf - dif), line_color, line_width)
-    
+
+def get_frame_comparation1(frame):
+    global  names_files_faces, coded_faces
+    tiempo_inicial = float(time.time())
+    # Procesar la imagen con OpenCV
+    frame2 = cv2.resize(frame, (0,0), None, 0.25, 0.25)    
+    rgb = cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB) #Conversion de color
+    # rgb = cv2.cvtColor(frame2, cv2.COLOR_RGB2GRAY)    
+    faces  = fr.face_locations(rgb) #identificar posibles rostros
+    facescod = fr.face_encodings(rgb, faces)
+    print(f'faces: {faces}')    
+    for facecod, faceloc in zip(facescod, faces) :        
+        yi, xf, yf, xi = faceloc
+        yi, xf, yf, xi = yi*4, xf*4, yf*4, xi*4     #Escalanos
+        comparaciones = fr.compare_faces(coded_faces, facecod, 0.62) #Comparamos rostros de DB con rostro en tiempo real
+        print(f'comparaciones: {comparaciones}')        
+        simi = fr.face_distance(coded_faces, facecod)        
+        min = np.argmin(simi) # Escalamos
+        if comparaciones[min]:
+            line_color = (0, 0, 255)              
+            nombreFile = names_files_faces[min].upper()
+            # cv2.putText(frame, nombreFile, (xi+6, yi-6), cv2.FONT_HERSHEY_SIMPLEX, 1, line_color, 3)
+            draw_lines(frame, xi, yi, xf, yf, dif=50, line_width=8, line_color=line_color)                                 
+            break
+        else:             
+            line_color = (0, 255, 0)
+            draw_lines(frame, xi, yi, xf, yf, dif=50, line_width=8, line_color=line_color)  
+    print('tiempo final: ',float(time.time() - tiempo_inicial)*1000)                  
+    return frame   
+
+def get_frame_comparation2(frame):
+    global  names_files_faces, coded_faces
+    tiempo_inicial = float(time.time())
+    # Procesar la imagen con OpenCV
+    frame2 = cv2.resize(frame, (0,0), None, 0.25, 0.25)    
+    rgb = cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB) #Conversion de color
+    # rgb = cv2.cvtColor(frame2, cv2.COLOR_RGB2GRAY)    
+    faces  = fr.face_locations(rgb) #identificar posibles rostros
+    facescod = fr.face_encodings(rgb, faces)
+    print(f'faces: {faces}')    
+    for facecod, faceloc in zip(facescod, faces) :        
+        yi, xf, yf, xi = faceloc
+        yi, xf, yf, xi = yi*4, xf*4, yf*4, xi*4     #Escalanos
+        comparaciones = fr.compare_faces(coded_faces, facecod, 0.62) #Comparamos rostros de DB con rostro en tiempo real
+        print(f'comparaciones: {comparaciones}')        
+        simi = fr.face_distance(coded_faces, facecod)        
+        min = np.argmin(simi) # Escalamos
+        if comparaciones[min]:
+            line_color = (0, 0, 255)              
+            nombreFile = names_files_faces[min].upper()
+            # cv2.putText(frame, nombreFile, (xi+6, yi-6), cv2.FONT_HERSHEY_SIMPLEX, 1, line_color, 3)
+            draw_lines(frame, xi, yi, xf, yf, dif=50, line_width=8, line_color=line_color)                                 
+            break
+        else:             
+            line_color = (0, 255, 0)
+            draw_lines(frame, xi, yi, xf, yf, dif=50, line_width=8, line_color=line_color)  
+    print('tiempo final: ',float(time.time() - tiempo_inicial)*1000)                  
+    return frame  
+ 
 def get_face(frame):
     global names_files_faces, coded_faces
     labels = []
@@ -362,30 +441,246 @@ def process_image(image_data):
 
 
     
-    
+#iniciar el hilo: thread    
 def start_video_thread():
-    global thread
-    saved_files1(dir='personal')
-    # print('todo bien')
-    thread = Thread(target=send_video)
-    thread.daemon = True
-    thread.start()
+    global hilos, dim_hilos, thread0, thread1, thread2
+    global queue
+    #     saved_files1(dir='personal')
+    # for i in range(0, dim_hilos): 
+    #     if hilos[i]  and (hilos[i] .is_alive()) :
+    #         print(f'el HILO:{i} ya se esta ejecutando---------------------')  
+    #     else:
+    #         hilos[i]  = Hilo(i, daemon=True, emit=f'processed_webrtc{i}')
+    #         hilos[i].start();         
+    # p1 = multiprocessing.Process(target=pru, args=(queue,))
+    # p1.start()
     
-    
-def send_video():
-    global clients #dd
-    capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
-    while capture.isOpened():
-        ret, frame = capture.read() # lee un fotograma de la cámara      
-        if ((not ret) or (clients == 0)): break
+    if thread0  and (thread0 .is_alive()) :
+        print(f'el HILO: thread0 ya se esta ejecutando---------------------')  
+    else:
+        # thread0 = Thread(target=prueba_hilo) 
+        thread0 = Thread(target=send_video0) 
+        thread0.daemon = True
+        thread0.start();   
         
-        # time.sleep(0.05)
-        frame = get_frame_comparation(frame)                        
-        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame[0])[1]).decode()       
+    # if thread1  and (thread1 .is_alive()) :
+    #     print(f'el HILO: thread1 ya se esta ejecutando---------------------')  
+    # else:
+    #     thread1  = Thread(target=send_video1) 
+    #     thread1.daemon = True
+    #     thread1.start();  
+                   
+       
+    if thread2  and (thread2.is_alive()) :
+        print(f'el HILO: thread2 ya se esta ejecutando---------------------')  
+    else:
+        # thread2 = Thread(target=prueba_hilo) 
+        thread2 = Thread(target=send_video2) 
+        thread2.daemon = True
+        thread2.start();   
+       
+    # p1 = multiprocessing.Process(target=pru)
+    # with ThreadPoolExecutor() as executor:j
+    #     executor.submit(send_video0)
+    #     executor.submit(send_video1)
+        
+    
+
+def pru(queue):    
+    capture  = cv2.VideoCapture(0)
+    i = 0
+    while capture.isOpened():
+    # while True:
+        ret, frame = capture.read() # lee un fotograma de la cámara      
+        if ((not ret) or (i+1 >= 256)): break        
+        # time.sleep(1/4)
+        tiempo_inicial = float(time.time())
+        #---------------------------------------------------------------                     
+        draw_compare_faces(frame)                        
+        #---------------------------------------------------------------       
+        tiempo_final = round((time.time()-tiempo_inicial)*1000, 2); 
+        print(f'--TIEMPO pru: {tiempo_final}')                      
+        # encoded_string = base64.b64encode(cv2.imencode('.jpg', frame[0])[1]).decode()   
+        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()       
+        queue.put(encoded_string)    
+        i+=1        
+    capture.release() # libera la cámara
+    print('finaliso pru --------------------------')
+        
+def prueba_hilo():
+    global queue, clients    
+    # time.sleep(30)    
+    while True:
+        if ((clients == 0)): break 
+        if  queue.qsize() > 0 :
+            data = {
+                    'img': queue.get(),
+                    'labels': '',
+                    'id': 0
+                }
+            socketio.emit('processed_webrtc', data)
+            # print('--prueba_hilo')
+    print('finaliso prueba_hilo --------------------------')
+    
+
+def buscar_pos(array, elem):
+    try:        
+        return array.index(elem)
+    except ValueError:
+        return -1  # Si no se encuentra ningún True en el array   
+
+    
+def send_video0():
+    global clients 
+    Q = deque(maxlen=128)
+    capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
+    # capture  = cv2.VideoCapture('G:\materias\cursos\python\descargados\Violence-Alert-System\Violence-Detection\Testing-videos\V_19.mp4') # selecciona la cámara 0 como fuente de video    
+    ultimo_tiempo = time.time()   # Tiempo inicial
+    while capture.isOpened():
+        ret, frame = capture.read() # lee un fotograma de la cámara
+        if ((not ret) or (clients == 0)): break        
+        # time.sleep(1/2)
+        #---------------------------------------------------------------   
+        tiempo_actual = (time.time())   
+        labels = []
+        if ( (tiempo_actual-ultimo_tiempo) >= 1): 
+            ultimo_tiempo = tiempo_actual
+            print(f'paso 2 seg------{tiempo_actual}')    
+            labels = draw_compare_faces(frame)                                    
+        tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
+        Q.append(tiempo_final)        
+        # print('--TIEMPO FINAL0: ', tiempo_final)               
+        #---------------------------------------------------------------                     
+        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()       
         data = {
             'img': encoded_string,
-            'labels': ''
+            'labels': labels,
+            'id': 0
         }
         socketio.emit('processed_webrtc', data)
-    print('finaliso send_video --------------------------')
+        # socketio.emit('event', data)
+    print('finaliso send_video0 --------------------------')
     capture.release() # libera la cámara
+    # print(Q)
+    # promedio = np.array(Q).mean(axis=0)   #realizar un promedio de predicción sobre el historial de predicciones anteriores
+    # print("PROMEDIO: ", promedio)
+    
+    
+def send_video1():
+    global clients 
+    capture  = cv2.VideoCapture(1) # selecciona la cámara 0 como fuente de video
+    # capture  = cv2.VideoCapture('G:\materias\cursos\python\descargados\Violence-Alert-System\Violence-Detection\Testing-videos\V_19.mp4') # selecciona la cámara 0 como fuente de video
+    ultimo_tiempo = time.time()   # Tiempo inicial
+    while capture.isOpened():
+        ret, frame = capture.read() # lee un fotograma de la cámara      
+        if ((not ret) or (clients == 0)): break        
+        # time.sleep(1/30)
+        tiempo_actual = float(time.time())
+        # if ((System.currentTimeMillis()-time)% delay == 0){
+        #---------------------------------------------------------------                     
+        if ((tiempo_actual-ultimo_tiempo) >= 0.5): 
+            ultimo_tiempo = tiempo_actual
+            # print(f'paso 2 seg------{tiempo_actual}')    
+            draw_detect_faces(frame)                        
+        #---------------------------------------------------------------       
+        tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
+        print(f'--TIEMPO FINAL1: {tiempo_final}' )                      
+        # encoded_string = base64.b64encode(cv2.imencode('.jpg', frame[0])[1]).decode()   
+        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
+        data = {
+            'img': encoded_string,
+            'labels': [],
+            'id': 1
+        }
+        socketio.emit('processed_webrtc',data)
+        # socketio.emit('event', data)
+    print('finaliso send_video1 --------------------------')
+    capture.release() # libera la cámara
+    
+def send_video2():
+    global clients 
+    # capture  = cv2.VideoCapture(1) # selecciona la cámara 0 como fuente de video
+    capture  = cv2.VideoCapture(Video.VIDEO1) # selecciona la cámara 0 como fuente de video
+    ultimo_tiempo = time.time()   # Tiempo inicial
+    model = load_model('modelnew.h5')
+    
+    while capture.isOpened():
+        ret, frame = capture.read() # lee un fotograma de la cámara      
+        if ((not ret) or (clients == 0)): break        
+        # time.sleep(1/30)
+        #---------------------------------------------------------------                     
+        tiempo_actual = float(time.time())
+        sw = False
+        if ((tiempo_actual-ultimo_tiempo) >= 0.5): 
+            ultimo_tiempo = tiempo_actual
+            sw = draw_violence_detection(frame=frame, model=model)                        
+            tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
+            print(f'--TIEMPO FINAL1: {tiempo_final}' )                      
+        #---------------------------------------------------------------       
+        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
+        data = {
+            'img': encoded_string,
+            'labels': '',
+            'sw': 1 if sw else 0,
+            'id': 2
+        }
+        socketio.emit('processed_webrtc', data)
+        # socketio.emit('event', data)
+    print('finaliso send_video2 --------------------------')
+    capture.release() # libera la cámara
+    
+    
+def draw_detect_faces(frame):
+    ubicaciones, confianzas = cv.detect_face(frame)
+    for (x, y, w, h), confianza in zip(ubicaciones, confianzas):
+        cv2.rectangle(frame, (x, y), (w, h), Color.VERDE, 2)                    
+        cv2.putText(frame, f"Confianza: {confianza:.2f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Color.VERDE, 2)        
+        
+        
+def draw_compare_faces(frame):
+    frame2 = cv2.resize(frame, (0,0), None, 1/4, 1/4)                              
+    rgb = cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB) #Correccion de color
+    ubicaciones_caras  = fr.face_locations(rgb) #identificar posibles rostros                      
+    # print(f'--------------ubicaciones_caras: {ubicaciones_caras}') 
+    caras_desconocidas = fr.face_encodings(rgb, ubicaciones_caras)#identificar ubicaciones de rostros
+    # print(f'--------------caras_desconocidas: {caras_desconocidas}')
+    sw = False if len(caras_desconocidas) == 0 else  True
+    labels = []
+    for facecod, faceloc in zip(caras_desconocidas, ubicaciones_caras) :     #for tarda 0.5 ms, por cada vuelta                           
+        yi, xf, yf, xi = tuple(val * 4 for val in faceloc) # aca valor de la tupla = val * 4
+        comparaciones = fr.compare_faces(coded_faces, facecod, 0.62) #Comparamos rostros de DB con rostro en tiempo real
+        # print(f'comparaciones: {comparaciones}')                    
+        i = buscar_pos(comparaciones, True)                 
+        if i == -1: # encontrar el índice del primer elemento True                          
+            draw_lines(frame, xi, yi, xf, yf, dif=50, line_width=8, line_color=(0, 255, 0) )
+        else:             
+            draw_lines(frame, xi, yi, xf, yf, dif=50, line_width=8, line_color=(0, 0, 255) ) 
+            nombreFile = names_files_faces[i].upper()               
+            labels.append(nombreFile)            
+            cv2.putText(frame, nombreFile, (xi+6, yi-8), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)                                                                          
+    #         # break       
+    return labels
+
+
+def draw_violence_detection(frame, model):
+    frame_copy = frame.copy()
+    frame_copy = cv2.cvtColor(frame_copy, cv2.COLOR_BGR2RGB) #convertir la imagen de BGR (el formato utilizado por OpenCV) a RGB
+    frame_copy = cv2.resize(frame_copy, (128, 128)).astype("float32")#imagen a 128 x 128 píxeles
+    frame_copy = frame_copy.reshape(128, 128, 3) / 255 #se divide cada valor de píxel por 255 para normalizar los valores de los píxeles a un rango entre 0 y 1.                
+    preds = model.predict(np.expand_dims(frame_copy, axis=0))[0] #haga predicciones en el marco
+    # print("preds",preds)
+    bool = (preds > 0.60)[0]                      
+    if (bool):
+        text_color = Color.ROJO                                       
+    else:  
+        text_color = Color.VERDE
+    cv2.putText(
+        img=frame,
+        text="Violence: {}".format(bool),
+        org=(35, 50),
+        fontFace= cv2.FONT_HERSHEY_SIMPLEX ,
+        fontScale=1.25,
+        color=text_color,
+        thickness=3
+    ) 
+    return bool

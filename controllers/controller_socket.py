@@ -74,10 +74,12 @@ names_files_faces = []
 coded_faces = []
 saved_files1(dir=ENV.DIR_FACES)
 print(ENV.DIR_FACES)
+sw_hilos = False
 clients = 0
 thread0 = None
 thread1 = None
 thread2 = None
+thread3 = None
 # hilo: Hilo = None
 hilos : Hilo = [None , None]
 dim_hilos = len(hilos)
@@ -116,6 +118,19 @@ def handle_connect():
     
 
 #socket eventos---------------------------------------------------------
+
+@socketio.on('start')
+def event(json):    
+    start_video_thread()
+
+@socketio.on('restart')
+def event(json):
+    global sw_hilos
+    sw_hilos = False
+    time.sleep(2)
+    saved_files1(dir=ENV.DIR_FACES)            
+    start_video_thread()
+
 @socketio.on('event')
 def event(json):
     start_video_thread()
@@ -443,9 +458,10 @@ def process_image(image_data):
     
 #iniciar el hilo: thread    
 def start_video_thread():
-    global hilos, dim_hilos, thread0, thread1, thread2
-    global queue
-    #     saved_files1(dir='personal')
+    global hilos, dim_hilos, thread0, thread1, thread2, thread3
+    global queue, sw_hilos
+    sw_hilos = True
+    # saved_files1(dir=ENV.DIR_FACES)
     # for i in range(0, dim_hilos): 
     #     if hilos[i]  and (hilos[i] .is_alive()) :
     #         print(f'el HILO:{i} ya se esta ejecutando---------------------')  
@@ -454,7 +470,7 @@ def start_video_thread():
     #         hilos[i].start();         
     # p1 = multiprocessing.Process(target=pru, args=(queue,))
     # p1.start()
-    
+    # saved_files1(dir=ENV.DIR_FACES)    
     if thread0  and (thread0 .is_alive()) :
         print(f'el HILO: thread0 ya se esta ejecutando---------------------')  
     else:
@@ -463,12 +479,12 @@ def start_video_thread():
         thread0.daemon = True
         thread0.start();   
         
-    # if thread1  and (thread1 .is_alive()) :
-    #     print(f'el HILO: thread1 ya se esta ejecutando---------------------')  
-    # else:
-    #     thread1  = Thread(target=send_video1) 
-    #     thread1.daemon = True
-    #     thread1.start();  
+    if thread1  and (thread1 .is_alive()) :
+        print(f'el HILO: thread1 ya se esta ejecutando---------------------')  
+    else:
+        thread1  = Thread(target=send_video1) 
+        thread1.daemon = True
+        thread1.start();  
                    
        
     if thread2  and (thread2.is_alive()) :
@@ -478,6 +494,14 @@ def start_video_thread():
         thread2 = Thread(target=send_video2) 
         thread2.daemon = True
         thread2.start();   
+        
+    if thread3  and (thread3.is_alive()) :
+        print(f'el HILO: thread3 ya se esta ejecutando---------------------')  
+    else:
+        # thread3 = Thread(target=prueba_hilo) 
+        thread3 = Thread(target=send_video3) 
+        thread3.daemon = True
+        thread3.start();   
        
     # p1 = multiprocessing.Process(target=pru)
     # with ThreadPoolExecutor() as executor:j
@@ -531,19 +555,19 @@ def buscar_pos(array, elem):
 
     
 def send_video0():
-    global clients 
+    global clients, sw_hilos
     Q = deque(maxlen=128)
     capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
     # capture  = cv2.VideoCapture('G:\materias\cursos\python\descargados\Violence-Alert-System\Violence-Detection\Testing-videos\V_19.mp4') # selecciona la cámara 0 como fuente de video    
     ultimo_tiempo = time.time()   # Tiempo inicial
     while capture.isOpened():
         ret, frame = capture.read() # lee un fotograma de la cámara
-        if ((not ret) or (clients == 0)): break        
+        if ((not ret) or (clients == 0) or (not sw_hilos)): break        
         # time.sleep(1/2)
         #---------------------------------------------------------------   
         tiempo_actual = (time.time())   
         labels = []
-        if ( (tiempo_actual-ultimo_tiempo) >= 1): 
+        if ( (tiempo_actual-ultimo_tiempo) >= 1.5): 
             ultimo_tiempo = tiempo_actual
             print(f'paso 2 seg------{tiempo_actual}')    
             labels = draw_compare_faces(frame)                                    
@@ -567,13 +591,13 @@ def send_video0():
     
     
 def send_video1():
-    global clients 
+    global clients, sw_hilos
     capture  = cv2.VideoCapture(1) # selecciona la cámara 0 como fuente de video
     # capture  = cv2.VideoCapture('G:\materias\cursos\python\descargados\Violence-Alert-System\Violence-Detection\Testing-videos\V_19.mp4') # selecciona la cámara 0 como fuente de video
     ultimo_tiempo = time.time()   # Tiempo inicial
     while capture.isOpened():
         ret, frame = capture.read() # lee un fotograma de la cámara      
-        if ((not ret) or (clients == 0)): break        
+        if ((not ret) or (clients == 0) or (not sw_hilos)): break        
         # time.sleep(1/30)
         tiempo_actual = float(time.time())
         # if ((System.currentTimeMillis()-time)% delay == 0){
@@ -606,7 +630,7 @@ def send_video2():
     
     while capture.isOpened():
         ret, frame = capture.read() # lee un fotograma de la cámara      
-        if ((not ret) or (clients == 0)): break        
+        if ((not ret) or (clients == 0) or (not sw_hilos)): break        
         # time.sleep(1/30)
         #---------------------------------------------------------------                     
         tiempo_actual = float(time.time())
@@ -627,6 +651,38 @@ def send_video2():
         socketio.emit('processed_webrtc', data)
         # socketio.emit('event', data)
     print('finaliso send_video2 --------------------------')
+    capture.release() # libera la cámara
+    
+def send_video3():
+    global clients 
+    # capture  = cv2.VideoCapture(1) # selecciona la cámara 0 como fuente de video
+    capture  = cv2.VideoCapture(Video.VIDEO5) # selecciona la cámara 0 como fuente de video
+    ultimo_tiempo = time.time()   # Tiempo inicial
+    model = load_model('modelnew.h5')
+    
+    while capture.isOpened():
+        ret, frame = capture.read() # lee un fotograma de la cámara      
+        if ((not ret) or (clients == 0) or (not sw_hilos)): break        
+        # time.sleep(1/30)
+        #---------------------------------------------------------------                     
+        tiempo_actual = float(time.time())
+        sw = False
+        # if ((tiempo_actual-ultimo_tiempo) >= 0.5): 
+        #     ultimo_tiempo = tiempo_actual
+        #     sw = draw_violence_detection(frame=frame, model=model)                        
+        #     tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
+        #     print(f'--TIEMPO FINAL1: {tiempo_final}' )                      
+        #---------------------------------------------------------------       
+        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
+        data = {
+            'img': encoded_string,
+            'labels': '',
+            'sw': 1 if sw else 0,
+            'id': 3
+        }
+        socketio.emit('processed_webrtc', data)
+        # socketio.emit('event', data)
+    print('finaliso send_video3 --------------------------')
     capture.release() # libera la cámara
     
     

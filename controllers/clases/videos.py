@@ -7,6 +7,6 @@ class Video:
     
     
     
-    
+    VIDEO5 = 'G:\materias\cursos\python\descargados\Violence-Alert-System\Violence-Detection\Testing-videos\carcel.mp4'
     
     

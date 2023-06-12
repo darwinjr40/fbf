@@ -2,6 +2,7 @@ const socket = io();
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
 const startButton = document.getElementById('start-button');
+const restartButton = document.getElementById('restart-button');
 const ctx = canvas.getContext("2d");
 const img0 = document.getElementById("imagen0");
 const img1 = document.getElementById("imagen1");
@@ -13,7 +14,7 @@ const imgs = {
   // y así sucesivamente
 };
 startButton.addEventListener('click', () => {
-  socket.emit('event', 'sad');
+  socket.emit('start', 'sad');
 //     navigator.mediaDevices.getUserMedia({video: true})
 //         .then(stream => {
 //           video.srcObject = stream;
@@ -29,6 +30,9 @@ startButton.addEventListener('click', () => {
 //         .catch(error => {
 //             console.log('Error accessing camera:', error.message);
 //         });
+});
+restartButton.addEventListener('click', () => {
+  socket.emit('restart', 'sad');
 });
 
 video.addEventListener("loadedmetadata", () => {

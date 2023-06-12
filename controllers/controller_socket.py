@@ -562,7 +562,7 @@ def buscar_pos(array, elem):
     
 def send_video0():
     global clients, sw_hilos
-    Q = deque(maxlen=128)
+    # Q = deque(maxlen=128)
     capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
     # capture  = cv2.VideoCapture('G:\materias\cursos\python\descargados\Violence-Alert-System\Violence-Detection\Testing-videos\V_19.mp4') # selecciona la cámara 0 como fuente de video    
     ultimo_tiempo = time.time()   # Tiempo inicial
@@ -573,13 +573,14 @@ def send_video0():
         #---------------------------------------------------------------   
         tiempo_actual = (time.time())   
         labels = []
-        if ( (tiempo_actual-ultimo_tiempo) >= 1.5): 
+        time.sleep(1/10)        
+        if ( (tiempo_actual-ultimo_tiempo) >= 3): 
             ultimo_tiempo = tiempo_actual
             print(f'paso 2 seg------{tiempo_actual}')    
-            labels = draw_compare_faces(frame)                                    
+            # labels = draw_compare_faces(frame)                                    
         tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
-        Q.append(tiempo_final)        
-        # print('--TIEMPO FINAL0: ', tiempo_final)               
+        print('--TIEMPO FINAL0: ', tiempo_final)               
+        # Q.append(tiempo_final)        
         #---------------------------------------------------------------                     
         encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()       
         data = {
@@ -604,11 +605,11 @@ def send_video1():
     while capture.isOpened():
         ret, frame = capture.read() # lee un fotograma de la cámara      
         if ((not ret) or (clients == 0) or (not sw_hilos)): break        
-        # time.sleep(1/30)
+        time.sleep(1/10)
         tiempo_actual = float(time.time())
         # if ((System.currentTimeMillis()-time)% delay == 0){
         #---------------------------------------------------------------                     
-        if ((tiempo_actual-ultimo_tiempo) >= 0.5): 
+        if ((tiempo_actual-ultimo_tiempo) >= 1): 
             ultimo_tiempo = tiempo_actual
             # print(f'paso 2 seg------{tiempo_actual}')    
             draw_detect_faces(frame)                        
@@ -637,15 +638,15 @@ def send_video2():
     while capture.isOpened():
         ret, frame = capture.read() # lee un fotograma de la cámara      
         if ((not ret) or (clients == 0) or (not sw_hilos)): break        
-        # time.sleep(1/30)
+        time.sleep(1/10)
         #---------------------------------------------------------------                     
         tiempo_actual = float(time.time())
         sw = False
-        if ((tiempo_actual-ultimo_tiempo) >= 0.5): 
+        if ((tiempo_actual-ultimo_tiempo) >= 1): 
             ultimo_tiempo = tiempo_actual
-            sw = draw_violence_detection(frame=frame, model=model)                        
-            tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
-            print(f'--TIEMPO FINAL1: {tiempo_final}' )                      
+            # sw = draw_violence_detection(frame=frame, model=model)                        
+        tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
+        print(f'--TIEMPO FINAL2: {tiempo_final}' )                      
         #---------------------------------------------------------------       
         encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
         data = {
@@ -669,15 +670,16 @@ def send_video3():
     while capture.isOpened():
         ret, frame = capture.read() # lee un fotograma de la cámara      
         if ((not ret) or (clients == 0) or (not sw_hilos)): break        
-        # time.sleep(1/30)
+        time.sleep(1/10)
         #---------------------------------------------------------------                     
         tiempo_actual = float(time.time())
         sw = False
         # if ((tiempo_actual-ultimo_tiempo) >= 0.5): 
         #     ultimo_tiempo = tiempo_actual
         #     sw = draw_violence_detection(frame=frame, model=model)                        
-        #     tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
-        #     print(f'--TIEMPO FINAL1: {tiempo_final}' )                      
+        tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
+        print(f'--TIEMPO FINAL3: {tiempo_final}' )     
+                         
         #---------------------------------------------------------------       
         encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
         data = {

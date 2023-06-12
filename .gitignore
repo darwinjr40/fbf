@@ -3,3 +3,5 @@
 __pycache__/
 .idea/
 .env
+controllers/__pycache__/
+controllers/clases/__pycache__/

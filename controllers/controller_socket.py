@@ -123,6 +123,7 @@ def handle_connect():
 def event(json):    
     start_video_thread()
 
+
 @socketio.on('restart')
 def event(json):
     global sw_hilos
@@ -131,6 +132,11 @@ def event(json):
     saved_files1(dir=ENV.DIR_FACES)            
     start_video_thread()
 
+@socketio.on('stop')
+def event(json):    
+    global sw_hilos
+    sw_hilos = False
+    
 @socketio.on('event')
 def event(json):
     start_video_thread()
@@ -592,7 +598,7 @@ def send_video0():
     
 def send_video1():
     global clients, sw_hilos
-    capture  = cv2.VideoCapture(1) # selecciona la cámara 0 como fuente de video
+    capture  = cv2.VideoCapture(Video.VIDEO1) # selecciona la cámara 0 como fuente de video
     # capture  = cv2.VideoCapture('G:\materias\cursos\python\descargados\Violence-Alert-System\Violence-Detection\Testing-videos\V_19.mp4') # selecciona la cámara 0 como fuente de video
     ultimo_tiempo = time.time()   # Tiempo inicial
     while capture.isOpened():
@@ -624,7 +630,7 @@ def send_video1():
 def send_video2():
     global clients 
     # capture  = cv2.VideoCapture(1) # selecciona la cámara 0 como fuente de video
-    capture  = cv2.VideoCapture(Video.VIDEO1) # selecciona la cámara 0 como fuente de video
+    capture  = cv2.VideoCapture(Video.VIDEO2) # selecciona la cámara 0 como fuente de video
     ultimo_tiempo = time.time()   # Tiempo inicial
     model = load_model('modelnew.h5')
     
@@ -656,7 +662,7 @@ def send_video2():
 def send_video3():
     global clients 
     # capture  = cv2.VideoCapture(1) # selecciona la cámara 0 como fuente de video
-    capture  = cv2.VideoCapture(Video.VIDEO5) # selecciona la cámara 0 como fuente de video
+    capture  = cv2.VideoCapture(Video.VIDEO3) # selecciona la cámara 0 como fuente de video
     ultimo_tiempo = time.time()   # Tiempo inicial
     model = load_model('modelnew.h5')
     

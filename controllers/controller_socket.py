@@ -120,7 +120,10 @@ def handle_connect():
 #socket eventos---------------------------------------------------------
 
 @socketio.on('start')
-def event(json):    
+def event(json):   
+    global sw_hilos 
+    saved_files1(dir=ENV.DIR_FACES)                
+    sw_hilos = True    
     start_video_thread()
 
 
@@ -130,6 +133,7 @@ def event(json):
     sw_hilos = False
     time.sleep(2)
     saved_files1(dir=ENV.DIR_FACES)            
+    sw_hilos = True        
     start_video_thread()
 
 @socketio.on('stop')
@@ -465,8 +469,7 @@ def process_image(image_data):
 #iniciar el hilo: thread    
 def start_video_thread():
     global hilos, dim_hilos, thread0, thread1, thread2, thread3
-    global queue, sw_hilos
-    sw_hilos = True
+    # global queue, sw_hilos
     # saved_files1(dir=ENV.DIR_FACES)
     # for i in range(0, dim_hilos): 
     #     if hilos[i]  and (hilos[i] .is_alive()) :
@@ -563,35 +566,36 @@ def buscar_pos(array, elem):
 def send_video0():
     global clients, sw_hilos
     # Q = deque(maxlen=128)
-    capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
-    # capture  = cv2.VideoCapture('G:\materias\cursos\python\descargados\Violence-Alert-System\Violence-Detection\Testing-videos\V_19.mp4') # selecciona la cámara 0 como fuente de video    
-    ultimo_tiempo = time.time()   # Tiempo inicial
-    while capture.isOpened():
-        ret, frame = capture.read() # lee un fotograma de la cámara
-        if ((not ret) or (clients == 0) or (not sw_hilos)): break        
-        # time.sleep(1/2)
-        #---------------------------------------------------------------   
-        tiempo_actual = (time.time())   
-        labels = []
-        time.sleep(1/10)        
-        if ( (tiempo_actual-ultimo_tiempo) >= 3): 
-            ultimo_tiempo = tiempo_actual
-            print(f'paso 2 seg------{tiempo_actual}')    
-            # labels = draw_compare_faces(frame)                                    
-        tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
-        print('--TIEMPO FINAL0: ', tiempo_final)               
-        # Q.append(tiempo_final)        
-        #---------------------------------------------------------------                     
-        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()       
-        data = {
-            'img': encoded_string,
-            'labels': labels,
-            'id': 0
-        }
-        socketio.emit('processed_webrtc', data)
-        # socketio.emit('event', data)
-    print('finaliso send_video0 --------------------------')
-    capture.release() # libera la cámara
+    while sw_hilos and (clients != 0):
+        capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
+        ultimo_tiempo = time.time()   # Tiempo inicial
+        while capture.isOpened():
+            ret, frame = capture.read() # lee un fotograma de la cámara
+            if ((not ret) or (clients == 0) or (not sw_hilos)): break        
+            # time.sleep(1/2)
+            #---------------------------------------------------------------   
+            tiempo_actual = (time.time())   
+            labels = []
+            time.sleep(1/16)        
+            if ( (tiempo_actual-ultimo_tiempo) >= 3): 
+                ultimo_tiempo = tiempo_actual
+                print(f'paso 2 seg------{tiempo_actual}')    
+                # labels = draw_compare_faces(frame)                                    
+            tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
+            print('--TIEMPO FINAL0: ', tiempo_final)               
+            # Q.append(tiempo_final)        
+            #---------------------------------------------------------------                     
+            encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()       
+            data = {
+                'img': encoded_string,
+                'labels': labels,
+                'id': 0
+            }
+            socketio.emit('processed_webrtc', data)
+            # socketio.emit('event', data)
+        print('finaliso send_video0 --------------------------')
+        capture.release() # libera la cámara
+        cv2.destroyAllWindows()
     # print(Q)
     # promedio = np.array(Q).mean(axis=0)   #realizar un promedio de predicción sobre el historial de predicciones anteriores
     # print("PROMEDIO: ", promedio)
@@ -599,99 +603,108 @@ def send_video0():
     
 def send_video1():
     global clients, sw_hilos
-    capture  = cv2.VideoCapture(Video.VIDEO1) # selecciona la cámara 0 como fuente de video
-    # capture  = cv2.VideoCapture('G:\materias\cursos\python\descargados\Violence-Alert-System\Violence-Detection\Testing-videos\V_19.mp4') # selecciona la cámara 0 como fuente de video
-    ultimo_tiempo = time.time()   # Tiempo inicial
-    while capture.isOpened():
-        ret, frame = capture.read() # lee un fotograma de la cámara      
-        if ((not ret) or (clients == 0) or (not sw_hilos)): break        
-        time.sleep(1/10)
-        tiempo_actual = float(time.time())
-        # if ((System.currentTimeMillis()-time)% delay == 0){
-        #---------------------------------------------------------------                     
-        if ((tiempo_actual-ultimo_tiempo) >= 1): 
-            ultimo_tiempo = tiempo_actual
-            # print(f'paso 2 seg------{tiempo_actual}')    
-            draw_detect_faces(frame)                        
-        #---------------------------------------------------------------       
-        tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
-        print(f'--TIEMPO FINAL1: {tiempo_final}' )                      
-        # encoded_string = base64.b64encode(cv2.imencode('.jpg', frame[0])[1]).decode()   
-        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
-        data = {
-            'img': encoded_string,
-            'labels': [],
-            'id': 1
-        }
-        socketio.emit('processed_webrtc',data)
-        # socketio.emit('event', data)
-    print('finaliso send_video1 --------------------------')
-    capture.release() # libera la cámara
+    
+    while sw_hilos and (clients != 0):
+        capture  = cv2.VideoCapture(Video.VIDEO1) # selecciona la cámara 0 como fuente de video
+        # capture  = cv2.VideoCapture('G:\materias\cursos\python\descargados\Violence-Alert-System\Violence-Detection\Testing-videos\V_19.mp4') # selecciona la cámara 0 como fuente de video
+        ultimo_tiempo = time.time()   # Tiempo inicial
+        while capture.isOpened():
+            ret, frame = capture.read() # lee un fotograma de la cámara      
+            if ((not ret) or (clients == 0) or (not sw_hilos)): break        
+            time.sleep(1/10)
+            tiempo_actual = float(time.time())
+            # if ((System.currentTimeMillis()-time)% delay == 0){
+            #---------------------------------------------------------------                     
+            if ((tiempo_actual-ultimo_tiempo) >= 1.5): 
+                ultimo_tiempo = tiempo_actual
+                # print(f'paso 2 seg------{tiempo_actual}')    
+                draw_detect_faces(frame)                        
+            #---------------------------------------------------------------       
+            tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
+            print(f'--TIEMPO FINAL1: {tiempo_final}' )                      
+            # encoded_string = base64.b64encode(cv2.imencode('.jpg', frame[0])[1]).decode()   
+            encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
+            data = {
+                'img': encoded_string,
+                'labels': [],
+                'id': 1
+            }
+            socketio.emit('processed_webrtc',data)
+            # socketio.emit('event', data)
+        print('finaliso send_video1 --------------------------')
+        capture.release() # libera la cámara
+        cv2.destroyAllWindows()
+        
     
 def send_video2():
-    global clients 
-    # capture  = cv2.VideoCapture(1) # selecciona la cámara 0 como fuente de video
-    capture  = cv2.VideoCapture(Video.VIDEO2) # selecciona la cámara 0 como fuente de video
-    ultimo_tiempo = time.time()   # Tiempo inicial
-    model = load_model('modelnew.h5')
+    global clients     
     
-    while capture.isOpened():
-        ret, frame = capture.read() # lee un fotograma de la cámara      
-        if ((not ret) or (clients == 0) or (not sw_hilos)): break        
-        time.sleep(1/10)
-        #---------------------------------------------------------------                     
-        tiempo_actual = float(time.time())
-        sw = False
-        if ((tiempo_actual-ultimo_tiempo) >= 1): 
-            ultimo_tiempo = tiempo_actual
-            # sw = draw_violence_detection(frame=frame, model=model)                        
-        tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
-        print(f'--TIEMPO FINAL2: {tiempo_final}' )                      
-        #---------------------------------------------------------------       
-        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
-        data = {
-            'img': encoded_string,
-            'labels': '',
-            'sw': 1 if sw else 0,
-            'id': 2
-        }
-        socketio.emit('processed_webrtc', data)
-        # socketio.emit('event', data)
-    print('finaliso send_video2 --------------------------')
-    capture.release() # libera la cámara
+    model = load_model('modelnew.h5')
+    while sw_hilos and (clients != 0):
+        capture  = cv2.VideoCapture(Video.VIDEO2) # selecciona la cámara 0 como fuente de video
+        ultimo_tiempo = time.time()   # Tiempo inicial
+        
+        while capture.isOpened():
+            ret, frame = capture.read() # lee un fotograma de la cámara      
+            if ((not ret) or (clients == 0) or (not sw_hilos)): break        
+            time.sleep(1/10)
+            #---------------------------------------------------------------                     
+            tiempo_actual = float(time.time())
+            sw = False
+            if ((tiempo_actual-ultimo_tiempo) >= 1.5): 
+                ultimo_tiempo = tiempo_actual
+                sw = draw_violence_detection(frame=frame, model=model)                        
+            tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
+            print(f'--TIEMPO FINAL2: {tiempo_final}' )                      
+            #---------------------------------------------------------------       
+            encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
+            data = {
+                'img': encoded_string,
+                'labels': '',
+                'sw': 1 if sw else 0,
+                'id': 2
+            }
+            socketio.emit('processed_webrtc', data)
+            # socketio.emit('event', data)
+        print('finaliso send_video2 --------------------------')
+        capture.release() # libera la cámara
+        cv2.destroyAllWindows()
+        
     
 def send_video3():
     global clients 
-    # capture  = cv2.VideoCapture(1) # selecciona la cámara 0 como fuente de video
-    capture  = cv2.VideoCapture(Video.VIDEO3) # selecciona la cámara 0 como fuente de video
-    ultimo_tiempo = time.time()   # Tiempo inicial
-    model = load_model('modelnew.h5')
-    
-    while capture.isOpened():
-        ret, frame = capture.read() # lee un fotograma de la cámara      
-        if ((not ret) or (clients == 0) or (not sw_hilos)): break        
-        time.sleep(1/10)
-        #---------------------------------------------------------------                     
-        tiempo_actual = float(time.time())
-        sw = False
-        # if ((tiempo_actual-ultimo_tiempo) >= 0.5): 
-        #     ultimo_tiempo = tiempo_actual
-        #     sw = draw_violence_detection(frame=frame, model=model)                        
-        tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
-        print(f'--TIEMPO FINAL3: {tiempo_final}' )     
-                         
-        #---------------------------------------------------------------       
-        encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
-        data = {
-            'img': encoded_string,
-            'labels': '',
-            'sw': 1 if sw else 0,
-            'id': 3
-        }
-        socketio.emit('processed_webrtc', data)
-        # socketio.emit('event', data)
-    print('finaliso send_video3 --------------------------')
-    capture.release() # libera la cámara
+    while sw_hilos and (clients != 0):
+        capture  = cv2.VideoCapture(Video.VIDEO3) # selecciona la cámara 0 como fuente de video
+        ultimo_tiempo = time.time()   # Tiempo inicial
+        model = load_model('modelnew.h5')
+        
+        while capture.isOpened():
+            ret, frame = capture.read() # lee un fotograma de la cámara      
+            if ((not ret) or (clients == 0) or (not sw_hilos)): break        
+            time.sleep(1/10)
+            #---------------------------------------------------------------                     
+            tiempo_actual = float(time.time())
+            sw = False
+            if ((tiempo_actual-ultimo_tiempo) >= 2.5): 
+                ultimo_tiempo = tiempo_actual
+                sw = draw_violence_detection(frame=frame, model=model)                        
+            tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
+            print(f'--TIEMPO FINAL3: {tiempo_final}' )     
+                            
+            #---------------------------------------------------------------       
+            encoded_string = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()                   
+            data = {
+                'img': encoded_string,
+                'labels': '',
+                'sw': 1 if sw else 0,
+                'id': 3
+            }
+            socketio.emit('processed_webrtc', data)
+            # socketio.emit('event', data)
+        print('finaliso send_video3 --------------------------')
+        capture.release() # libera la cámara
+        cv2.destroyAllWindows()
+        
     
     
 def draw_detect_faces(frame):

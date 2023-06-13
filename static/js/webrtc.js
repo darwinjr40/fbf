@@ -3,6 +3,7 @@ const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
 const startButton = document.getElementById('start-button');
 const restartButton = document.getElementById('restart-button');
+const stopButton = document.getElementById('stop-button');
 const ctx = canvas.getContext("2d");
 const img0 = document.getElementById("imagen0");
 const img1 = document.getElementById("imagen1");
@@ -33,6 +34,9 @@ startButton.addEventListener('click', () => {
 });
 restartButton.addEventListener('click', () => {
   socket.emit('restart', 'sad');
+});
+stopButton.addEventListener('click', () => {
+  socket.emit('stop', 'sad');
 });
 
 video.addEventListener("loadedmetadata", () => {

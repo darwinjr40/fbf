@@ -567,7 +567,8 @@ def send_video0():
     global clients, sw_hilos
     # Q = deque(maxlen=128)
     while sw_hilos and (clients != 0):
-        capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
+        # capture  = cv2.VideoCapture(0) # selecciona la cámara 0 como fuente de video
+        capture  = cv2.VideoCapture('V_0.mp4') # selecciona la cámara 0 como fuente de video
         ultimo_tiempo = time.time()   # Tiempo inicial
         while capture.isOpened():
             ret, frame = capture.read() # lee un fotograma de la cámara
@@ -580,7 +581,7 @@ def send_video0():
             if ( (tiempo_actual-ultimo_tiempo) >= 3): 
                 ultimo_tiempo = tiempo_actual
                 print(f'paso 2 seg------{tiempo_actual}')    
-                # labels = draw_compare_faces(frame)                                    
+                labels = draw_compare_faces(frame)                                    
             tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
             print('--TIEMPO FINAL0: ', tiempo_final)               
             # Q.append(tiempo_final)        
@@ -618,7 +619,7 @@ def send_video1():
             if ((tiempo_actual-ultimo_tiempo) >= 1.5): 
                 ultimo_tiempo = tiempo_actual
                 # print(f'paso 2 seg------{tiempo_actual}')    
-                draw_detect_faces(frame)                        
+                # draw_detect_faces(frame)                        
             #---------------------------------------------------------------       
             tiempo_final = round((time.time()-tiempo_actual)*1000, 2); 
             print(f'--TIEMPO FINAL1: {tiempo_final}' )                      
@@ -746,7 +747,7 @@ def draw_violence_detection(frame, model):
     frame_copy = frame_copy.reshape(128, 128, 3) / 255 #se divide cada valor de píxel por 255 para normalizar los valores de los píxeles a un rango entre 0 y 1.                
     preds = model.predict(np.expand_dims(frame_copy, axis=0))[0] #haga predicciones en el marco
     # print("preds",preds)
-    bool = (preds > 0.60)[0]                      
+    bool = (preds > 0.75)[0]                      
     if (bool):
         text_color = Color.ROJO                                       
     else:  
